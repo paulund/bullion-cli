@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { homedir } from 'os';
 import { resolve } from 'path';
-import type { LatestResponse, TimeseriesDay, TimeseriesResponse } from './types.js';
+import type { CentralBankReservesResponse, LatestResponse, TimeseriesDay, TimeseriesResponse } from './types.js';
 
 dotenv.config();
 dotenv.config({ path: resolve(homedir(), '.config', 'bullion', '.env'), override: false });
@@ -18,6 +18,19 @@ export class BullionApiError extends Error {
     super(message);
     this.name = 'BullionApiError';
   }
+}
+
+export interface CentralBankReserveFilters {
+  country?: string;
+  start?: string;
+  end?: string;
+}
+
+interface ApiErrorEnvelope {
+  error?: {
+    code?: string;
+    message?: string;
+  };
 }
 
 function getApiKey(): string {
@@ -85,7 +98,42 @@ async function request<T>(path: string, params: Record<string, string> = {}): Pr
 
   if (!res.ok) {
     const body = await res.text();
-    throw new BullionApiError(`API error (${res.status}): ${body}`, res.status);
+    let details: ApiErrorEnvelope['error'];
+    try {
+      details = (JSON.parse(body) as ApiErrorEnvelope).error;
+    } catch {
+      details = undefined;
+    }
+
+    if (details?.code === 'plan_required') {
+      throw new BullionApiError(
+        'This endpoint requires a Pro or Enterprise plan. Upgrade at https://bullionapi.dev',
+        res.status,
+        details.code,
+      );
+    }
+
+    if (details?.code === 'email_not_verified') {
+      throw new BullionApiError(
+        'Verify your email address before using the API at https://bullionapi.dev',
+        res.status,
+        details.code,
+      );
+    }
+
+    if (details?.code === 'data_unavailable') {
+      throw new BullionApiError(
+        'Central-bank reserve data is temporarily unavailable. Please try again later.',
+        res.status,
+        details.code,
+      );
+    }
+
+    throw new BullionApiError(
+      details?.message ? `API error (${res.status}): ${details.message}` : `API error (${res.status}): ${body}`,
+      res.status,
+      details?.code,
+    );
   }
 
   return (await res.json()) as T;
@@ -105,6 +153,16 @@ export async function fetchTimeseries(
     start_date: startDate,
     end_date: endDate,
   });
+}
+
+export async function fetchCentralBankReserves(
+  filters: CentralBankReserveFilters = {},
+): Promise<CentralBankReservesResponse> {
+  const params: Record<string, string> = {};
+  if (filters.country !== undefined) params.country = filters.country;
+  if (filters.start !== undefined) params.start = filters.start;
+  if (filters.end !== undefined) params.end = filters.end;
+  return request<CentralBankReservesResponse>('/v1/central-bank-reserves', params);
 }
 
 // Re-export TimeseriesDay so callers don't need to import from types.ts directly

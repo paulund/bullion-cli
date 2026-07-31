@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import { PriceReport } from './types.js';
+import { CentralBankReservesResponse, PriceReport } from './types.js';
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$',
@@ -49,6 +49,47 @@ export function coloredPct(pct: number | null): string {
   const formatted = formatPct(pct);
   if (pct === null) return chalk.dim(formatted);
   return pct >= 0 ? chalk.green(formatted) : chalk.red(formatted);
+}
+
+function formatReserveMoney(value: number | null): string {
+  if (value === null) return 'N/A';
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatReserveChange(value: number | null): string {
+  if (value === null) return 'N/A';
+  const sign = value >= 0 ? '+' : '-';
+  return `${sign}${formatReserveMoney(Math.abs(value))}`;
+}
+
+function formatReservePct(value: number | null): string {
+  return value === null ? 'N/A' : `${value.toFixed(2)}%`;
+}
+
+export function formatReserves(response: CentralBankReservesResponse): string {
+  const lines = [
+    `Central-bank reserves (${response.coverage.countries} ${response.coverage.countries === 1 ? 'country' : 'countries'})`,
+    '',
+  ];
+
+  for (const reserve of response.reserves) {
+    lines.push(`${reserve.country_name} (${reserve.country} / ${reserve.country_iso3}) — ${reserve.as_of_year}`);
+    lines.push(`  Gold reserve value: ${formatReserveMoney(reserve.gold_reserve_value_usd)}`);
+    lines.push(`  Gold share: ${formatReservePct(reserve.gold_share_pct)}`);
+    lines.push(`  Annual gold value change: ${formatReserveChange(reserve.annual_gold_value_change_usd)}`);
+    if (reserve.data_quality) lines.push(`  Data quality: ${reserve.data_quality}`);
+    lines.push('');
+  }
+
+  lines.push(`Source: ${response.source.name}`);
+  lines.push(`Underlying provider: ${response.source.underlying_provider}`);
+  lines.push(`Source updated: ${response.coverage.source_updated_at}`);
+  lines.push(`Methodology: ${response.methodology.warning}`);
+  return lines.join('\n');
+}
+
+export function displayReserves(response: CentralBankReservesResponse): void {
+  console.log(formatReserves(response));
 }
 
 export function displayReports(reports: PriceReport[]): void {
