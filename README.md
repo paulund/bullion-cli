@@ -69,7 +69,33 @@ bullion -m gold          # --metal is alias for --asset
 
 # Help
 bullion --help
+
+# View annual central-bank reserve values (Pro or Enterprise)
+bullion reserves
+bullion reserves --country GB --start 2020 --end 2025
 ```
+
+The reserves command reads the cached `GET /v1/central-bank-reserves` endpoint. It accepts optional
+`--country`, `--start`, and `--end` filters and returns the latest complete observation for each country when
+no year bounds are supplied.
+
+### Central-bank reserves example output
+
+```text
+Central-bank reserves (1 country)
+
+United Kingdom (GB / GBR) — 2025
+  Gold reserve value: $25,000,000,000.00
+  Gold share: 12.50%
+  Annual gold value change: +$10,000,000,000.00
+
+Source: World Bank, World Development Indicators
+Underlying provider: International Monetary Fund, International Financial Statistics
+Source updated: 2026-07-13
+Methodology: Annual value changes combine holdings changes, gold-price movement, and revisions and do not measure tonnes bought or sold.
+```
+
+Annual value changes are derived valuations. They do not measure tonnes bought or sold.
 
 ### Example output
 
